@@ -18,7 +18,7 @@ function [caBandFiltObjs, mBands] = computeComplementaryFilterbank(vEdgeFreqs, i
 %     mBands           filtered signal matrix (:,bands)
 %
 % Author :  (c) Nils L. Westhausen (TGM @ Jade-Hochschule)
-%           (for license see end of file)
+%           
 % Date   :  26 Dec 2015
 % Updated:  22 Feb 2016
 %-----------------------------------------------------------------------
@@ -50,8 +50,10 @@ function [caBandFiltObjs, mBands] = computeComplementaryFilterbank(vEdgeFreqs, i
     caBandFiltObjs = cell(1, iNumBands);
     % generation of filter objects
     [caFiltObjs, caCompFiltObjs, caAllPassObjs] = GenFiltObjs(vEdgeFreqs, iOrder);
+
+    caFiltObj = {};
     % recursive generation of the filter objects of each band
-    [caBandFiltObjs, ~] = GenBandFiltObjs([], caBandFiltObjs, ...
+    [caBandFiltObjs, ~] = GenBandFiltObjs(caFiltObj, caBandFiltObjs, ...
         iRecursivIdx, caFiltObjs, caCompFiltObjs, caAllPassObjs);
     % generating filtered output if called
     if nargout > 1
@@ -60,25 +62,17 @@ function [caBandFiltObjs, mBands] = computeComplementaryFilterbank(vEdgeFreqs, i
 end
 
 % function to generate filter objects of each band recursively 
-function [caBandFiltObjs, RecursivIdx] = GenBandFiltObjs(filtObj, caBandFiltObjs, RecursivIdx, caFiltObjs, caCompFiltObjs, caAllPassObjs)
+function [caBandFiltObjs, RecursivIdx] = GenBandFiltObjs(caFiltObj, caBandFiltObjs, RecursivIdx, caFiltObjs, caCompFiltObjs, caAllPassObjs)
     % checking for number of given filter objects
     if length(caFiltObjs) > 2
         % separating filtObjs
         FiltIdx = 2^nextpow2(length(caFiltObjs)) / 2;
         FiltIdxsLeft = 1:FiltIdx - 1;
         FiltIdxsRigth = FiltIdx + 1:length(caFiltObjs);
-        % checking for empty filtObj for first parse and cascading filtObjs
-        if isempty(filtObj)
-            FiltObj1 = dfilt.cascade(caFiltObjs{FiltIdx}, ...
-                caAllPassObjs{FiltIdxsRigth});
-            FiltObj2 = dfilt.cascade(caCompFiltObjs{FiltIdx}, ...
-                caAllPassObjs{FiltIdxsLeft});
-        else
-            FiltObj1 = dfilt.cascade(filtObj, caFiltObjs{FiltIdx}, ...
-                caAllPassObjs{FiltIdxsRigth});
-            FiltObj2 = dfilt.cascade(filtObj, caCompFiltObjs{FiltIdx}, ...
-                caAllPassObjs{FiltIdxsLeft});
-        end
+        FiltObj1 = [caFiltObj, caFiltObjs(FiltIdx), ...
+            caAllPassObjs(FiltIdxsRigth)];
+        FiltObj2 = [caFiltObj, caCompFiltObjs(FiltIdx), ...
+            caAllPassObjs(FiltIdxsLeft)];
         % recursively calling the function with the serrated filtObjs
         [caBandFiltObjs, RecursivIdx] = GenBandFiltObjs(FiltObj1, ...
             caBandFiltObjs, RecursivIdx, caFiltObjs(FiltIdxsLeft), ...
@@ -88,13 +82,13 @@ function [caBandFiltObjs, RecursivIdx] = GenBandFiltObjs(filtObj, caBandFiltObjs
             caCompFiltObjs(FiltIdxsRigth), caAllPassObjs(FiltIdxsRigth));
     elseif length(caFiltObjs) == 1
          % saving filtObjs to the cell
-        caBandFiltObjs{RecursivIdx} = dfilt.cascade(filtObj, caFiltObjs{1});
-        caBandFiltObjs{RecursivIdx+1} = dfilt.cascade(filtObj, ...
+        caBandFiltObjs{RecursivIdx} = dfilt.cascade(caFiltObj{1:end}, caFiltObjs{1});
+        caBandFiltObjs{RecursivIdx+1} = dfilt.cascade(caFiltObj{1:end}, ...
             caCompFiltObjs{1});
         RecursivIdx = RecursivIdx + 2;
     elseif length(caFiltObjs) == 2
-        y1 = dfilt.cascade(filtObj, caFiltObjs{2});
-        caBandFiltObjs{RecursivIdx + 2} = dfilt.cascade(filtObj, ...
+        y1 = [caFiltObj, caFiltObjs(2)];
+        caBandFiltObjs{RecursivIdx + 2} = dfilt.cascade(caFiltObj{1:end}, ...
             caCompFiltObjs{2}, caAllPassObjs{1});
         [caBandFiltObjs, RecursivIdx] = GenBandFiltObjs(y1, caBandFiltObjs, ...
             RecursivIdx, caFiltObjs(1), caCompFiltObjs(1), caAllPassObjs(1));
